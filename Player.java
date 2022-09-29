@@ -10,51 +10,49 @@ import java.util.*;
     |  Student Number : c3238805 |
     \============================/   */
 
-public class Player extends Thread{
+public class Player{
 
-    private static int myPort;
-    private static boolean foundPlayer;    //variable to hold if found a player
-    private static DatagramSocket socket;
-    private static DatagramPacket packet;
     
-    private static String broadcastAddress;
+    boolean foundPlayer;    //variable to hold if found a player
+    DatagramPacket received_packet;
+
+    int myPort;
+    DatagramSocket socket;
+    
+    private static InetAddress broadcastAddress;
     private static int broadcastPort;
 
+    public Player(){
+        this.foundPlayer = false;
+        this.myPort = new Random().nextInt(1000) + 5000; // initial a random TCP port number
+        byte[] buf = new byte[new String("NEW PLAYER:" + myPort).getBytes().length];
+        this.received_packet = new DatagramPacket(buf, buf.length);
+    }
+
     public static void main(String arg[]) throws Exception{
-        
+        Player newPlayer = new Player();
         //ask user input Broadcast address and Broadcast port
         //broadcastAddress = arg[0];
         //broadcastPort = Integer.parseInt(arg[1]);  
 
-        broadcastAddress = "192.168.2.255";
-        broadcastPort = 9999;
-        
+        broadcastAddress = InetAddress.getByName("192.168.2.255");
+        broadcastPort = 8888;
 
-        InetAddress baddress =InetAddress.getByName(broadcastAddress) ;
-        socket = new DatagramSocket(broadcastPort); // initial a socket using user specified broadcast Port.
+        newPlayer.broadcastAddress = broadcastAddress;
+        newPlayer.socket = new DatagramSocket(broadcastPort); // initial a socket using user specified broadcast Port.
+        newPlayer.socket.setSoTimeout(3000); //time out in 30 second  = 30000
 
-        socket.setSoTimeout(30000); //time out in 30 second  = 30000
-        myPort = new Random().nextInt(1000) + 5000;     //initial a TCP port number
         System.out.println("Listening on UDP port " + broadcastPort);
+    
+        
+        Thread Thread_Timeout = new Thread_Timeout(newPlayer);
+        Thread Thread_listenner = new Thread_listenner(newPlayer);
+        
+        
+        Thread_Timeout.start();
+        Thread_listenner.start();
+        
 
-
-        //initial packet contains with its broadcast Port number.
-        byte[] buf = new byte[new String("NEW PLAYER:" + myPort).getBytes().length];
-        packet = new DatagramPacket(buf, buf.length);
-        //socket.send(packet); // first send a packet to the current port (to see if anyone is waiting on a new player)
-        
-        Runnable Thread_Timeout = new Thread_Timeout(socket,baddress,broadcastPort,myPort);
-        Runnable Thread_listenner = new Thread_listenner(socket);
-        
-        while(true){
-            Thread_Timeout.run();
-            Thread_listenner.run();
-        }
-        
-       
-        
-        
-        
         //check on the received msg to see if its valid
 
 
@@ -265,97 +263,113 @@ public class Player extends Thread{
 
     }
 
+    public DatagramSocket getSocket(){
+        return this.socket;
+    }
+    public int getBroadcastPort(){
+        return this.broadcastPort;
+    }
+    
+    public InetAddress getBroadcastAddress() {
+        return this.broadcastAddress;
+    }
+
+    public int getmyPort(){
+        return this.myPort;
+    }
+    public boolean foundPlayer(){
+        return this.foundPlayer;
+    }
+    public DatagramPacket getreceived_packet(){
+        return this.received_packet;
+    }
+
     
 
 }
 
 // this thread handle send self msg to broadcast address
-class Thread_Timeout implements Runnable{
-    private int myPort;
-    private DatagramSocket socket;
-    private InetAddress baddress;
-    private int broadcastPort;
+class Thread_Timeout extends Thread{
 
-    public Thread_Timeout(DatagramSocket socket, InetAddress baddress,int broadcastPort, int myPort){
-        
-        
-        this.socket = socket;
-        this.baddress = baddress;
-        this.broadcastPort = broadcastPort;
-        this.myPort = myPort;
+    private Player newPlayer;
 
+    public Thread_Timeout(Player newPlayer){
+          
+        this.newPlayer = newPlayer;
     }
-
+    
+    @Override
     public void run(){
+        
+        byte[] mybuf = new String("NEW PLAYER:" + newPlayer.getmyPort()).getBytes();
+        DatagramPacket selfpacket = new DatagramPacket(mybuf, mybuf.length,newPlayer.getBroadcastAddress(),8888);
 
-        byte[] mybuf = new byte[new String("NEW PLAYER:" + myPort).getBytes().length];
-        DatagramPacket packet = new DatagramPacket(mybuf, mybuf.length, baddress, broadcastPort);
-
-        try {
-            socket.receive(packet);
-        } catch (SocketTimeoutException e) {
-            // if time out , send a new msg to the same port
+        while(newPlayer.foundPlayer == false ){
             try {
-                socket.send(packet);
-            } catch (IOException e1) {
-                
-                e1.printStackTrace();
-            } // send a new msg to the same port
+                newPlayer.socket.receive(newPlayer.getreceived_packet());
+            } catch (SocketTimeoutException e) {
+                // if time out , send a new msg to the same port
+                try {
+                    newPlayer.socket.send(selfpacket);
+                } catch (IOException e1) {
+                    
+                    e1.printStackTrace();
+                } // send a new msg to the same port
 
-        } catch (IOException e) {
-            
-            e.printStackTrace();
+            } catch (IOException e) {
+                
+                e.printStackTrace();
+            }
         }
+        
 
 
     }
 }
 
-class Thread_listenner implements Runnable {
+class Thread_listenner extends Thread {
 
-    private int myPort;
-    private DatagramSocket socket;
-    private InetAddress baddress;
-    private int broadcastPort;
+    private Player newPlayer;
 
-    public Thread_listenner(DatagramSocket socket){
+    public Thread_listenner(Player newPlayer){
         
-        this.socket = socket;
+        this.newPlayer = newPlayer;
 
     }
-
+    
+    @Override
     public void run() {
 
-        byte[] buf = new byte[new String("NEW PLAYER:" + myPort).getBytes().length];    // initial a buf size
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-
         
-        try {
-            socket.receive(packet);
-        } catch (IOException e) {
-            
-            e.printStackTrace();
+
+        // this listenner will loop until found a player
+        while(newPlayer.foundPlayer == false){
+            DatagramPacket received_packet = newPlayer.getreceived_packet();
+
+            String receivedMsg = new String(received_packet.getData(), StandardCharsets.UTF_8);
+            if (receivedMsg != null) {
+
+                // check if the msg is from a different program
+                String[] split = receivedMsg.split(":");
+
+                // validate the received msg
+                if (split.length == 2 && (!split[1].equals(String.valueOf(newPlayer.getmyPort())))) {
+
+                    // when the received port number is different , establish a TCP connection and
+                    // send response back.
+                    System.out.println("Received: " + receivedMsg);
+
+                    // serverTCP(); //initial aa server TCP connection
+
+                }
+
+            }
+
+
+
         }
 
-        // if we can pass the try block above, we have received a msg
-        String receivedMsg = new String(buf, StandardCharsets.UTF_8);
-        // check if the msg is from a different program
-        String[] split = receivedMsg.split(":");
-    
-        // validate the received msg
-        if (!split[1].equals(String.valueOf(myPort))) {
-            receivedMsg = new String(buf, StandardCharsets.UTF_8);
-            // when the received port number is different , establish a TCP connection and
-            // send response back.
-            System.out.println("Received: " + receivedMsg);
-
-            // serverTCP(); //initial aa server TCP connection
-
-            
-
-        }
-
-        
+   
 
     }
 
