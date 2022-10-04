@@ -14,17 +14,19 @@ public class Node {
     private boolean isTaken;
     private String ship_display;
 
+
     public Node(){
         
     }
 
-    public Node(int row,int collum) throws Exception{
+    public Node(int row,int collum) {
         this.node_display = "  ";
         this.ship_display = "  ";
         this.row = row;
         this.collum = collum;
-        this.plotString = String.valueOf(int_to_char(row)) + collum;
+        this.plotString = String.valueOf(int_to_char(row)) + (collum+1);
         this.isTaken = false;
+
     }
 
     public int getrow(){
@@ -35,7 +37,7 @@ public class Node {
         return this.collum;
     }
 
-    public char int_to_char(int i) throws Exception {
+    public char int_to_char(int i)  {
 
         char c;
         int counter = 0;
@@ -53,7 +55,7 @@ public class Node {
         }
 
         if(!found){
-            throw new Exception("Unable to match integer with character");
+            c = '-';
         }
         return c;
     }
@@ -85,6 +87,8 @@ public class Node {
     public boolean getisTaken(){
         return isTaken;
     }
+
+
 
 
     

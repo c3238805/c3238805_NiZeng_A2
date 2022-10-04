@@ -14,8 +14,15 @@ public class BattleShip {
     private int rows;
     private int collums;
     private Node foundNode;
+    private Node [] Aircraft;
+    private Node[] Battleship;
+    private Node[] Cruiser;
+    private Node[] Patrol;
+    private Node[] Submarine;
+    
 
-    public BattleShip() throws Exception{
+
+    public BattleShip() {
         this.rows = 10;
         this.collums = 10;
         this.graph = new Node[rows][collums];
@@ -23,7 +30,39 @@ public class BattleShip {
         SetShip();
     }
 
-    public void GenerateGraph(int row, int collum) throws Exception{
+    public void record_board(){
+        
+        for(Node n:Aircraft){
+
+            n.setShipdisplay("  ");
+        }
+        for (Node n : Battleship) {
+            n.setShipdisplay("  ");
+        }
+        for (Node n : Cruiser) {
+
+            n.setShipdisplay("  ");
+        }
+        for (Node n : Patrol) {
+
+            n.setShipdisplay("  ");
+        }
+        for (Node n : Submarine) {
+
+            n.setShipdisplay("  ");
+        }
+
+    }
+
+    public void update_record(String nodeDisplay,String updateString){
+
+        Node node = findNode(nodeDisplay);
+        node.setShipdisplay(updateString);
+
+    }
+
+
+    public void GenerateGraph(int row, int collum){
 
         for(int i=0;i<row;i++){
             for(int j=0;j<collum;j++){
@@ -37,25 +76,23 @@ public class BattleShip {
     public void SetShip(){
 
         // Aircraft carrier (5) 
-        Node [] Aircraft = RandomPlaceShip(" A",5);
+        Aircraft = RandomPlaceShip(" A",5);
         
         // Battleship (4) 
-        Node[] Battleship = RandomPlaceShip(" B", 4);
+        Battleship = RandomPlaceShip(" B", 4);
         
         // Cruiser (3) 
-        Node[] Cruiser = RandomPlaceShip(" C", 3);
+        Cruiser = RandomPlaceShip(" C", 3);
 
         //Patrol Boat (2) 
-        Node[] Patrol = RandomPlaceShip(" P", 2);
+        Patrol = RandomPlaceShip(" P", 2);
         
         // Submarine (3)
-        Node[] Submarine = RandomPlaceShip(" S", 3);
-        //
-
+        Submarine = RandomPlaceShip(" S", 3);
+        
 
     }
     
-
     public Node[] RandomPlaceShip(String ship_display, int space){
        
         Node [] ship = new Node[space];
@@ -255,5 +292,193 @@ public class BattleShip {
 
         return mazeString;
     }
+
+    public String fire(String plot){
+
+        String reply = "";
+        Node findNode = new Node();
+
+        if(validPlot(plot)){
+            findNode = findNode(plot); // then find the coresponse node
+            
+            if(findNode.getShipdisplay().matches("  ") ){
+
+                findNode.setNodedisplay(" X");
+
+                reply = "MISS:" + findNode.getPlotString();
+
+            }else if (findNode.getShipdisplay().matches(" A")){
+
+                findNode.setShipdisplay(" X");
+                if ((isSunk(Aircraft) == true) && isGameOver() == false) {
+
+                    reply = "SUNK:" + findNode.getPlotString() + ":Aircraft carrier";
+                }
+                else if ((isSunk(Aircraft) == true) && isGameOver() == true) {
+
+                    reply = "GAME OVER:" + findNode.getPlotString() + ":Aircraft carrier";
+                }else{
+                    reply = "HIT:"+findNode.getPlotString();
+                }
+                
+            } else if (findNode.getShipdisplay().matches(" B")) {
+                
+                findNode.setShipdisplay(" X");
+                if ((isSunk(Battleship) == true) && isGameOver() == false) {
+
+                    reply = "SUNK:" + findNode.getPlotString() + ":Battleship";
+                }
+                else if ((isSunk(Battleship) == true) && isGameOver() == true) {
+
+                    reply = "GAME OVER:" + findNode.getPlotString() + ":Battleship";
+                } else {
+                    reply = "HIT:" + findNode.getPlotString();
+                }
+
+            } else if (findNode.getShipdisplay().matches(" C")) {
+                
+                findNode.setShipdisplay(" X");
+                if ((isSunk(Cruiser) == true) && isGameOver() == false) {
+
+                    reply = "SUNK:" + findNode.getPlotString() + ":Cruiser";
+                }
+                else if ((isSunk(Cruiser) == true) && isGameOver() == true) {
+
+                    reply = "GAME OVER:" + findNode.getPlotString() + ":Cruiser";
+                } else {
+                    reply = "HIT:" + findNode.getPlotString();
+                }
+
+            } else if (findNode.getShipdisplay().matches(" P")) {
+                
+                findNode.setShipdisplay(" X");
+                if ((isSunk(Patrol) == true) && isGameOver() == false) {
+
+                    reply = "SUNK:" + findNode.getPlotString() + ":Patrol";
+                } else if ((isSunk(Patrol) == true) && isGameOver() == true) {
+
+                    reply = "GAME OVER:" + findNode.getPlotString() + ":Patrol";
+                } else {
+                    reply = "HIT:" + findNode.getPlotString();
+                }
+
+            } else if (findNode.getShipdisplay().matches(" S")) {
+                
+                findNode.setShipdisplay(" X");
+                if ((isSunk(Submarine) == true) && isGameOver() == false) {
+
+                    reply = "SUNK:" + findNode.getPlotString() + ":Submarine";
+                }
+                else if ((isSunk(Submarine) == true) && isGameOver() == true) {
+
+                    reply = "GAME OVER:" + findNode.getPlotString() + ":Submarine";
+                } 
+                else {
+                    reply = "HIT:" + findNode.getPlotString();
+                }
+            } else if (findNode.getShipdisplay().matches(" .")) {
+                reply = "MISS:" + findNode.getPlotString();
+            } else if (findNode.getShipdisplay().matches(" X")) {
+                reply = "HIT:" + findNode.getPlotString();
+            } 
+
+        }else {
+            reply= "Invalid:I don't know.";
+        }
+
+        return reply;
+
+    }
+
+    public boolean isSunk(Node [] ship){
+        boolean isSunk = true;
+
+        for(Node n: ship){
+            if(!n.getShipdisplay().matches(" X")){
+                
+                isSunk = false;
+                break;
+            }
+        }
+
+        return isSunk;
+
+    }
+
+    public boolean isGameOver(){
+        boolean isGameOver = true;
+
+        for (Node n : Aircraft) {
+            if(!n.getShipdisplay().equals(" X")){
+                isGameOver = false;
+                return isGameOver;
+            }
+        }
+        for (Node n : Battleship) {
+            if (!n.getShipdisplay().equals(" X")) {
+                isGameOver = false;
+                return isGameOver;
+            }
+        }
+        for (Node n : Cruiser) {
+            if (!n.getShipdisplay().equals(" X")) {
+                isGameOver = false;
+                return isGameOver;
+            }
+        }
+        for (Node n : Patrol) {
+            if (!n.getShipdisplay().equals(" X")) {
+                isGameOver = false;
+                return isGameOver;
+            }
+        }
+        for (Node n : Submarine) {
+            if (!n.getShipdisplay().equals(" X")) {
+                isGameOver = false;
+                return isGameOver;
+            }
+        }
+
+        return isGameOver;
+    }
+
+    // this method is to check if the user entered plot is valid
+    public boolean validPlot(String plot){
+
+        boolean validPlot =false;
+
+        for (Node[] nodes : graph) {
+            for (Node n : nodes) {
+                if (n.getPlotString().equals(plot)) {
+                    // node found
+                    validPlot = true;
+                    return validPlot;
+                }
+            }
+        }
+
+        return validPlot;
+
+    }
+
+    public Node findNode(String plot){
+
+        Node findNode = new Node();
+
+        for (Node[] nodes : graph) {
+            for (Node n : nodes) {
+                if (n.getPlotString().equals(plot)) {
+                    // node found
+                    findNode = n;
+                    break;
+                }
+            }
+        }
+
+        return findNode;
+
+    }
+
+
 
 }

@@ -1,7 +1,12 @@
 import java.io.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
 
 /*  
     /============================\
@@ -20,48 +25,57 @@ public class Player{
     DatagramSocket socket;
     
     private static InetAddress broadcastAddress;
+    private static String broadcastAddress_string;
     private static int broadcastPort;
+    static int TCP_port;
+    
+    static BattleShip gameboard;
 
     public Player(){
         this.foundPlayer = false;
         this.myPort = new Random().nextInt(1000) + 5000; // initial a random TCP port number
-        byte[] buf = new byte[new String("NEW PLAYER:" + myPort).getBytes().length];
+        byte[] buf = new byte[1024];
         this.received_packet = new DatagramPacket(buf, buf.length);
+        this.broadcastAddress_string = "";
+
     }
 
     public static void main(String arg[]) throws Exception{
+
+        Scanner reader = new Scanner(System.in); // reading from console: system.in
+
         Player newPlayer = new Player();
         //ask user input Broadcast address and Broadcast port
         //broadcastAddress = arg[0];
         //broadcastPort = Integer.parseInt(arg[1]);  
 
+        broadcastAddress_string = "192.168.2.255";
         broadcastAddress = InetAddress.getByName("192.168.2.255");
         broadcastPort = 8888;
 
         newPlayer.broadcastAddress = broadcastAddress;
-        newPlayer.socket = new DatagramSocket(broadcastPort); // initial a socket using user specified broadcast Port.
+
+        newPlayer.createSocket(broadcastPort);       //initial a socket connection 
+        
         newPlayer.socket.setSoTimeout(3000); //time out in 30 second  = 30000
 
+        byte[] mybuf = new String("NEW PLAYER:" + newPlayer.getmyPort() ).getBytes();
+        DatagramPacket selfpacket = new DatagramPacket(mybuf, mybuf.length, newPlayer.getBroadcastAddress(), newPlayer.getBroadcastPort());
+
+                
+        newPlayer.socket.send(selfpacket);
         System.out.println("Listening on UDP port " + broadcastPort);
     
         
         Thread Thread_Timeout = new Thread_Timeout(newPlayer);
         Thread Thread_listenner = new Thread_listenner(newPlayer);
         
-        
         Thread_Timeout.start();
         Thread_listenner.start();
+    
+        //Thread_Timeout.join();
+        Thread_listenner.join();
         
-
-        //check on the received msg to see if its valid
-
-
-        // first boarcast 
-
-        //start searching on different ports
-        
-        //if recive a response on the generated port, start TCP connection
-
 
 
         //TCP
@@ -75,177 +89,127 @@ public class Player{
 
     }
 
-/* 
-    public static void serverTCP(){
-
-
-        // establish a TCP connection
-        Scanner reader = new Scanner(System.in); // reading from console: system.in
-
-        System.out.println("SERVER: current port: " + myPort);
-
-        String response = "";
-
-        // while not recived a shut down command, server stay alive
+    //this method is to start TCP connection 
+    public static void initialTCP(int TCPport){
+        Scanner scanner = new Scanner(System.in);
+        String Enemy_msg = "";
 
         while (true) {
 
             try (
                     // first initial a serverSocket using port 4500
-                    ServerSocket serversocket = new ServerSocket(myPort);
+                    ServerSocket serversocket = new ServerSocket(TCPport);
                     Socket socket = serversocket.accept();
                     BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true);) {
-                System.out.println("CONNECTION OPEN"); // notice when connection is ready
-                String msg = ""; // variable to hold Client's response
 
-                // convert the msg from ASCII to string
-                while ((msg = asciiToString(in.readLine())) != null) {
+                    System.out.println("TCP CONNECTION OPEN"); // notice when connection is ready
+                    String msg = ""; // variable to hold Client's response
+                    
+                    BattleShip game_board = new BattleShip();
+                    setgame_board(game_board);
+                    System.out.println(game_board.printGraph());
 
-                    System.out.format("CLIENT: %s\n", msg); // display client msg on console
+                    BattleShip record_board = new BattleShip();
+                    record_board.record_board();
+                    System.out.println(record_board.printGraph());
+
+                    //the player who initial the game get to go first (Player 1)
+                    System.out.print("FIRE:");
+                    String choose_plot = scanner.nextLine();
+                    out.println("FIRE:"+choose_plot);
+
+                while ((msg = in.readLine()) != null) {
+
+                    String[] plot = msg.split(":");
 
                     // Revice Command--------------------------------------------------------------
-                    if (msg.equals("TAX" + "\n")) {
+                    if (msg.contains("MISS:") ) {
 
-                        // print Server response msg in console
-                        System.out.print("SERVER:" + "TAX: OK" + "\n");
+                        // update the record
+                        record_board.update_record(plot[1], " .");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
 
-                        // convert into ACSII and send to server
-                        out.println(toAscii("TAX: OK" + "\n"));
-                    }
+                    } else if (msg.contains("HIT:") ) {
+                        // update the record
+                        record_board.update_record(plot[1], " X");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
 
-                    else if (msg.contains("STORE" + "\n")) {
-                        // first check if the Size of LinkedList<TaxNode> taxScale >=10
-                        if (ts.taxScale.getSize() >= 10) {
-                            response = "STORE: Fail (sufficient to store up to ten income ranges, Maximum ranges reached.)";
-                            // print Server response msg in console
-                            System.out.print("SERVER:" + response + "\n");
+                    } else if (msg.contains("SUNK:") ) {
+                        // update the record
+                        record_board.update_record(plot[1], " X");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
 
-                            // convert into ACSII and send to server
-                            out.println(toAscii("STORE:" + response + "\n"));
+                    } else if (msg.contains("GAME OVER:") ) {
+                        // if received game over msg, the current player has now wont the game
+                        record_board.update_record(plot[1], " X");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        
+                        System.out.println("YOU NOW WON THE GAME !");
+
+                        //inform other player that the game is finished
+                        out.println("YOU HAVE LOST");
+                        out.flush();
+                        System.exit(0);
+
+                    } else if (msg.contains("FIRE:") ) {
+
+                        msg = game_board.fire(plot[1]); // this line will return the response of the fire plot
+
+                        Enemy_msg += "(" + msg + ")" + "    / "; // save the enemy's msg
+
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        
+                        if (game_board.isGameOver() == true) {
+                            out.println(msg);
+                            out.flush();
 
                         } else {
+                            out.println(msg);
+                            out.flush();
 
-                            // first filter the data
-                            String[] msg_array = msg.split("\n");
+                            System.out.print("FIRE:");
+                            choose_plot = scanner.nextLine();
 
-                            if (msg_array[2].isEmpty()) {
-                                msg_array[2] = "-1";
-                            }
-                            // start_income , end_income, base_tax , tax_per_dollar
-                            TaxNode newRange = new TaxNode(
-                                    Integer.parseInt(msg_array[1]), Integer.parseInt(msg_array[2]),
-                                    Integer.parseInt(msg_array[3]), Integer.parseInt(msg_array[4]));
-
-                            // insert the TaxNode inorder
-                            ts.taxScale.insertInOrder(newRange);
-
-                            // send STORE: OK response back to client
-                            response = "STORE: OK";
-                            // print Server response msg in console
-                            System.out.print("SERVER:" + response + "\n");
-
-                            // convert into ACSII and send to server
-                            out.println(toAscii(response + "\n"));
-
+                            out.println("FIRE:" + choose_plot);
+                            out.flush();
                         }
+                        
+                        
 
-                    }
-
-                    else if (msg.contains("QUERY" + "\n")) {
-
-                        Iterator<TaxNode> listAllRange = ts.taxScale.iterator();
-                        String queryOut = "";
-                        while (listAllRange.hasNext()) {
-
-                            TaxNode temp = listAllRange.next();
-                            String emptyString = temp.getEnd_income().toString();
-                            if (temp.getEnd_income().equals(-1)) {
-                                emptyString = "~";
-                            }
-
-                            queryOut += temp.getStart_income() + "  " + emptyString + "  " + temp.getBase_tax()
-                                    + "  " + temp.getTax_per_dollar() + "  " + "\n";
-
-                        }
-
-                        // send QUERY: OK response back to client
-                        response = queryOut + "QUERY: OK";
-                        // print Server response msg in console
-                        System.out.print("SERVER:" + response + "\n");
-
-                        // convert into ACSII and send to server
-                        out.println(toAscii(response + "\n"));
-
-                    }
-
-                    else if (msg.contains("BYE" + "\n")) {
-                        // send response msg: BYE: OK to Client
-
-                        response = "BYE: OK";
-                        // print Server response msg in console
-                        System.out.print("SERVER:" + response + "\n");
-
-                        // convert into ACSII and send to server
-                        out.println(toAscii(response + "\n"));
-
-                        break;
-
-                    }
-
-                    else if (msg.contains("END" + "\n")) {
-
-                        response = "END:OK";
-                        // print Server response msg in console
-                        System.out.print("SERVER:" + response + "\n");
-
-                        // convert into ACSII and send to server
-                        out.println(toAscii(response + "\n"));
-
-                        break;
-
-                    }
-
+                    } else if (msg.contains("YOU HAVE LOST")) {
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        //print out in console log
+                        System.out.println("YOU HAVE LOST");
+                        System.exit(0);
+                    } 
                     else {
 
-                        // check msg to see if its valid
-                        if (checkInteger(msg)) {
-                            msg = msg.replace("\n", "");
-                            // run the calculator method and get response string
-                            response = calculator(Integer.parseInt(msg));
+                        msg = "Player 1: I don't know.";
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
 
-                            System.out.print("SERVER:" + response + "\n");
-                            // convert into ACSII and send to server
-                            out.println(toAscii(response + "\n"));
-
-                        } else {
-
-                            // when recive a undefined command from client site, response with I dont Know
-                            // msg
-                            response = "I DON'T KNOW " + msg;
-                            System.out.print("SERVER:" + response + "\n");
-                            // convert into ACSII and send to server
-                            out.println(toAscii(response + "\n"));
-
-                        }
-
+                        // when received undefined msg, reply back with "I don't know"
+                        out.println(msg); // reply
+                        out.flush();
                     }
 
-                }
 
-                // when break out of the while (in.readline()) loop
-
-                if (response.contains("END:OK")) {
-                    // Server close all the connection
-                    reader.close();
-                    serversocket.close();
-                    socket.close();
-                    in.close();
-                    out.close();
-                    System.out.println("TaxServer Shutdown.");
-                    // exit the application
-                    System.exit(0);
                 }
+                    
 
             } catch (IOException e) { // You should have some better exception handling
                 e.printStackTrace();
@@ -253,19 +217,176 @@ public class Player{
             }
 
         }
+    }
 
+    public static void TCP_transmit(InetAddress broadcastAddress,int TCP_port){
+
+        Scanner scanner = new Scanner(System.in);
+        String Enemy_msg = "";
+
+
+        try (
+                Socket socket = new Socket(broadcastAddress.getLocalHost(), TCP_port);
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);) {
+
+                System.out.println("TCP CONNECTION CONNECTED"); // notice when connection is ready
+                String msg = ""; // variable to hold responses
+
+                BattleShip game_board = new BattleShip();
+                setgame_board(game_board);
+                System.out.println(game_board.printGraph());
+
+                BattleShip record_board = new BattleShip();
+                record_board.record_board();
+                System.out.println(record_board.printGraph());
+
+            // convert the msg from ASCII to string
+            while ((msg =in.readLine()) != null) {
+
+                String[] plot = msg.split(":");
+                
+
+                // Revice Command--------------------------------------------------------------
+                if (msg.contains("MISS:") ) {
+
+                        // update the record
+                        record_board.update_record(plot[1], " .");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                    } else if (msg.contains("HIT:") ) {
+
+                        // update the record
+                        record_board.update_record(plot[1], " X");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                    } else if (msg.contains("SUNK:") ) {
+
+                        // update the record
+                        record_board.update_record(plot[1], " X");
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                    } else if (msg.contains("GAME OVER:") ) {
+
+                        // if received game over msg, the current player has now wont the game
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+                        System.out.println("YOU NOW WON THE GAME !");
+
+                        // inform other player that the game is finished
+                        out.println("YOU HAVE LOST");
+                        out.flush();
+                        System.exit(0);
+
+                    } 
+                    else if(msg.contains("FIRE:") ){
+
+                        msg = game_board.fire(plot[1]);     // this line will return String of reply on corresponding plot
+                        
+                        Enemy_msg += "("+msg +")"+ "    / "; // save the enemy's msg
+
+                        
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+                        System.out.println("Enemy moves:" + Enemy_msg);
+
+                        if(game_board.isGameOver() == true){
+                            out.println(msg);
+                            out.flush();
+
+                        }else {
+                            out.println(msg);
+                            out.flush();
+
+                            System.out.print("FIRE:");
+                            String choose_plot = scanner.nextLine();
+
+                            out.println("FIRE:" + choose_plot);
+                            out.flush();
+                        }
+
+
+                    } else if (msg.contains("YOU HAVE LOST")) {
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        // print out in console log
+                        System.out.println("YOU HAVE LOST");
+                        System.exit(0);
+                    } 
+                    else {
+
+                        msg = "Player 2: I don't know.";
+                        out.println(msg); // reply
+                        out.flush();
+                    }
+                
+                    
+
+                    
+                
+
+            }
+
+        } catch (Exception e) { // You should have some better exception handling
+            
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+    public void createSocket(int UDPPort){
+
+        boolean successful = false;
+
+        // this while loop will run until establish a socket
+        if(successful == false){
+            try {
+                this.socket = new DatagramSocket(UDPPort); // initial a socket using user specified broadcast
+                                                                 // Port.
+                successful = true;  // when reach this line, the socket is created successfully                                                 
+            } catch (SocketException e) {
+                // when having a bindException, it could be a socket already created with the
+                // same broadcastAddress and broadcast Port (when running on the same local
+                // machine)
+                createSocket(new Random().nextInt(1000)+5000);
+
+            }
+        }
         
     }
-      */
 
-    //this method is to start TCP connection 
-    public static void startTCP(){
 
+    public static byte[] trim(byte[] bytes) {
+        int i = bytes.length - 1;
+        while (i >= 0 && bytes[i] == 0) {
+            --i;
+        }
+
+        return Arrays.copyOf(bytes, i + 1);
+    }
+
+    public static BattleShip getgame_boarad(){
+        return gameboard;
+    }
+
+    public static void setgame_board(BattleShip gameboard){
+        gameboard = gameboard;
     }
 
     public DatagramSocket getSocket(){
         return this.socket;
     }
+    
     public int getBroadcastPort(){
         return this.broadcastPort;
     }
@@ -277,20 +398,40 @@ public class Player{
     public int getmyPort(){
         return this.myPort;
     }
-    public boolean foundPlayer(){
+    
+    public boolean getfoundPlayer(){
         return this.foundPlayer;
     }
+    
+    public void setfoundPlayer(boolean t) {
+        this.foundPlayer = t;
+    }
+    
     public DatagramPacket getreceived_packet(){
         return this.received_packet;
+    }   
+    
+    public void setTCP_port(int TCP_port){
+        this.TCP_port = TCP_port;
+    }
+    
+    public int getTCP_port() {
+        return TCP_port;
     }
 
-    
+    public void closeUDP(DatagramSocket socket){
+        socket.close();
+    }
+
+    public String get_broadcastAddress_string(){
+        return this.broadcastAddress_string;
+    }
 
 }
 
-// this thread handle send self msg to broadcast address
-class Thread_Timeout extends Thread{
 
+class Thread_Timeout extends Thread{
+    // this thread handle send self msg to broadcast address
     private Player newPlayer;
 
     public Thread_Timeout(Player newPlayer){
@@ -302,28 +443,34 @@ class Thread_Timeout extends Thread{
     public void run(){
         
         byte[] mybuf = new String("NEW PLAYER:" + newPlayer.getmyPort()).getBytes();
-        DatagramPacket selfpacket = new DatagramPacket(mybuf, mybuf.length,newPlayer.getBroadcastAddress(),8888);
+        DatagramPacket selfpacket = new DatagramPacket(mybuf, mybuf.length,newPlayer.getBroadcastAddress(),newPlayer.getBroadcastPort());
 
-        while(newPlayer.foundPlayer == false ){
+        while(newPlayer.getfoundPlayer() == false ){
             try {
                 newPlayer.socket.receive(newPlayer.getreceived_packet());
             } catch (SocketTimeoutException e) {
-                // if time out , send a new msg to the same port
-                try {
-                    newPlayer.socket.send(selfpacket);
-                } catch (IOException e1) {
-                    
-                    e1.printStackTrace();
-                } // send a new msg to the same port
+                String receivedMsg = new String(newPlayer.getreceived_packet().getData(), StandardCharsets.UTF_8);
+                byte[] trimmed = Player.trim(newPlayer.getreceived_packet().getData());
+                receivedMsg = new String(trimmed);
+                // check if the msg is from a different program
+                String[] split = receivedMsg.split(":");
+
+                if(split.length>1 && newPlayer.getfoundPlayer() == false){
+                    // if time out , send a new msg to the same port
+                    try {
+                        newPlayer.socket.send(selfpacket);
+                    } catch (IOException e1) {
+                        
+                        e1.printStackTrace();
+                    } // send a new msg to the same port
+                    }
 
             } catch (IOException e) {
                 
                 e.printStackTrace();
             }
+
         }
-        
-
-
     }
 }
 
@@ -340,30 +487,60 @@ class Thread_listenner extends Thread {
     @Override
     public void run() {
 
-        
-
         // this listenner will loop until found a player
         while(newPlayer.foundPlayer == false){
-            DatagramPacket received_packet = newPlayer.getreceived_packet();
+            
+            String receivedMsg = new String(newPlayer.getreceived_packet().getData(), StandardCharsets.UTF_8);
+            byte[] trimmed = Player.trim(newPlayer.getreceived_packet().getData());
+            receivedMsg = new String(trimmed);
+            // check if the msg is from a different program
+            String[] split = receivedMsg.split(":");
 
-            String receivedMsg = new String(received_packet.getData(), StandardCharsets.UTF_8);
-            if (receivedMsg != null) {
+            // validate the received msg
+            if ( split.length > 1 ) {
 
-                // check if the msg is from a different program
-                String[] split = receivedMsg.split(":");
+                int tcpport = Integer.parseInt(split[1]);
 
-                // validate the received msg
-                if (split.length == 2 && (!split[1].equals(String.valueOf(newPlayer.getmyPort())))) {
-
+                if(tcpport != newPlayer.myPort && !split[0].contains("PLAYER FOUND")){
                     // when the received port number is different , establish a TCP connection and
                     // send response back.
                     System.out.println("Received: " + receivedMsg);
 
-                    // serverTCP(); //initial aa server TCP connection
+                    // player is now found
+                    // send udp packet to the sender (so the sender know connection has been found)
+                    try {
+                        DatagramPacket self_packet = new DatagramPacket(
+                                new String("PLAYER FOUND:" + newPlayer.myPort).getBytes(),
+                                new String("PLAYER FOUND:" + newPlayer.myPort).getBytes().length,
+                                newPlayer.getreceived_packet().getAddress(), newPlayer.getreceived_packet().getPort());
 
+                        newPlayer.socket.send(self_packet);
+
+                    } catch (IOException e) {
+
+                        e.printStackTrace();
+                    }
+
+                    newPlayer.setfoundPlayer(true);
+                    newPlayer.setTCP_port(newPlayer.myPort);
+
+                    // initial a TCP connection using current myPort
+                    Player.initialTCP(newPlayer.myPort);
+
+                    break;
+
+                }else if(tcpport != newPlayer.myPort && split[0].contains("PLAYER FOUND")){
+                    newPlayer.setfoundPlayer(true);
+                    Player.TCP_transmit(newPlayer.getBroadcastAddress(), tcpport);
                 }
 
+
+              
+                
+
             }
+
+            
 
 
 
