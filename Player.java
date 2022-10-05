@@ -77,22 +77,13 @@ public class Player{
         Thread_listenner.join();
         
 
-
-        //TCP
-       // BattleShip p1 = new BattleShip();
-
-        //p1.printGraph();
-        //System.out.println(p1.printGraph());
-
-        
-
-
     }
 
     //this method is to start TCP connection 
     public static void initialTCP(int TCPport){
         Scanner scanner = new Scanner(System.in);
         String Enemy_msg = "";
+        String my_moves = "";
 
         while (true) {
 
@@ -117,12 +108,13 @@ public class Player{
                     //the player who initial the game get to go first (Player 1)
                     System.out.print("FIRE:");
                     String choose_plot = scanner.nextLine();
+                    my_moves += "FIRE:"+ choose_plot + " "; 
                     out.println("FIRE:"+choose_plot);
 
                 while ((msg = in.readLine()) != null) {
 
                     String[] plot = msg.split(":");
-
+                    
                     // Revice Command--------------------------------------------------------------
                     if (msg.contains("MISS:") ) {
 
@@ -130,27 +122,50 @@ public class Player{
                         record_board.update_record(plot[1], " .");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
+
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+                        
 
                     } else if (msg.contains("HIT:") ) {
                         // update the record
                         record_board.update_record(plot[1], " X");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                     } else if (msg.contains("SUNK:") ) {
                         // update the record
                         record_board.update_record(plot[1], " X");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                     } else if (msg.contains("GAME OVER:") ) {
                         // if received game over msg, the current player has now wont the game
                         record_board.update_record(plot[1], " X");
+
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
                         
                         System.out.println("YOU NOW WON THE GAME !");
 
@@ -170,18 +185,24 @@ public class Player{
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
 
                         System.out.println("Enemy moves:" + Enemy_msg);
-                        
+                        System.out.println("My moves:" + my_moves);
+
                         if (game_board.isGameOver() == true) {
                             out.println(msg);
                             out.flush();
 
-                        } else {
+                        } else if (msg.contains("I don't know.")) {
+                            out.println(msg);
+                            out.flush();
+                        } 
+                        else {
                             out.println(msg);
                             out.flush();
 
                             System.out.print("FIRE:");
                             choose_plot = scanner.nextLine();
 
+                            my_moves += "FIRE:" + choose_plot + " ";
                             out.println("FIRE:" + choose_plot);
                             out.flush();
                         }
@@ -191,16 +212,48 @@ public class Player{
                     } else if (msg.contains("YOU HAVE LOST")) {
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
                         //print out in console log
                         System.out.println("YOU HAVE LOST");
                         System.exit(0);
-                    } 
+
+                    } else if (msg.contains("I don't know.")) {
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
+                        if (game_board.isGameOver() == true) {
+                            out.println(msg);
+                            out.flush();
+
+                        } 
+                        else {
+                           
+                            System.out.print("FIRE:");
+                            choose_plot = scanner.nextLine();
+
+                            my_moves += "FIRE:" + choose_plot + " ";
+                            out.println("FIRE:" + choose_plot);
+                            out.flush();
+                        }
+
+                    }
                     else {
 
                         msg = "Player 1: I don't know.";
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                         // when received undefined msg, reply back with "I don't know"
                         out.println(msg); // reply
@@ -223,7 +276,7 @@ public class Player{
 
         Scanner scanner = new Scanner(System.in);
         String Enemy_msg = "";
-
+        String my_moves = "";
 
         try (
                 Socket socket = new Socket(broadcastAddress.getLocalHost(), TCP_port);
@@ -254,7 +307,12 @@ public class Player{
                         record_board.update_record(plot[1], " .");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                     } else if (msg.contains("HIT:") ) {
 
@@ -262,7 +320,11 @@ public class Player{
                         record_board.update_record(plot[1], " X");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                     } else if (msg.contains("SUNK:") ) {
 
@@ -270,14 +332,24 @@ public class Player{
                         record_board.update_record(plot[1], " X");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                     } else if (msg.contains("GAME OVER:") ) {
 
                         // if received game over msg, the current player has now wont the game
+                        record_board.update_record(plot[1], " X");
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        my_moves += "(" + msg + ")" + "    / "; // save the my_moves's msg
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
                         System.out.println("YOU NOW WON THE GAME !");
 
                         // inform other player that the game is finished
@@ -296,19 +368,25 @@ public class Player{
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
                         System.out.format("Enemy: %s\n", msg); // display server msg on console
+
                         System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                         if(game_board.isGameOver() == true){
                             out.println(msg);
                             out.flush();
 
-                        }else {
+                        } else if(msg.contains("I don't know.")){
+                            out.println(msg);
+                            out.flush();
+                        }
+                        else {
                             out.println(msg);
                             out.flush();
 
                             System.out.print("FIRE:");
                             String choose_plot = scanner.nextLine();
-
+                            my_moves += "FIRE:" + choose_plot + " ";
                             out.println("FIRE:" + choose_plot);
                             out.flush();
                         }
@@ -317,11 +395,45 @@ public class Player{
                     } else if (msg.contains("YOU HAVE LOST")) {
                         System.out.println(game_board.printGraph());
                         System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
                         // print out in console log
                         System.out.println("YOU HAVE LOST");
                         System.exit(0);
-                    } 
+
+                    } else if (msg.contains("I don't know.")) {
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
+
+                        if (game_board.isGameOver() == true) {
+                            out.println(msg);
+                            out.flush();
+
+                        } else {
+                           
+                            System.out.print("FIRE:");
+                            String choose_plot = scanner.nextLine();
+                            my_moves += "FIRE:" + choose_plot + " ";
+                            out.println("FIRE:" + choose_plot);
+                            out.flush();
+                        }
+
+
+                    }
                     else {
+                        System.out.println(game_board.printGraph());
+                        System.out.println(record_board.printGraph());
+                        System.out.format("Enemy: %s\n", msg); // display server msg on console
+
+                        System.out.println("Enemy moves:" + Enemy_msg);
+                        System.out.println("My moves:" + my_moves);
 
                         msg = "Player 2: I don't know.";
                         out.println(msg); // reply

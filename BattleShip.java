@@ -376,9 +376,9 @@ public class BattleShip {
                 else {
                     reply = "HIT:" + findNode.getPlotString();
                 }
-            } else if (findNode.getShipdisplay().matches(" .")) {
+            } else if (findNode.getShipdisplay().equals(" .")) {
                 reply = "MISS:" + findNode.getPlotString();
-            } else if (findNode.getShipdisplay().matches(" X")) {
+            } else if (findNode.getShipdisplay().equals(" X")) {
                 reply = "HIT:" + findNode.getPlotString();
             } 
 
